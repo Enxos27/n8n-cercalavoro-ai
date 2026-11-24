@@ -1,0 +1,795 @@
+{
+  "name": "Nodo C Motore multi-utente",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 12
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        16,
+        -368
+      ],
+      "id": "299c8827-c63d-4018-9923-6635c7b08df5",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://portale.inpa.gov.it/concorsi-smart/api/concorso-public-area/search-better",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page",
+              "value": "0"
+            },
+            {
+              "name": "size",
+              "value": "100"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "origin",
+              "value": "https://www.inpa.gov.it"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"text\": \"\",\n  \"categoriaId\": null,\n  \"regioneId\": null,\n  \"status\": [\n    \"OPEN\"\n  ],\n  \"settoreId\": null,\n  \"provinciaCodice\": null,\n  \"dateFrom\": null,\n  \"dateTo\": null,\n  \"livelliAnzianitaIds\": null,\n  \"tipoImpiegoId\": null,\n  \"salaryMin\": null,\n  \"salaryMax\": null,\n  \"enteRiferimentoName\": \"\",\n  \"searchOnDataPubblicazione\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        320,
+        -288
+      ],
+      "id": "7765c21e-dff4-4361-bf6e-9c7efafe165c",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "content",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        -160
+      ],
+      "id": "1d1c2945-de3f-4411-a1bf-3b6c7aa9d4e5",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Sei un consulente esperto di concorsi pubblici e selezioni di lavoro in Italia.\nValuta quanto ciascuno dei bandi seguenti è adatto al candidato.\n\n=== PROFILO CANDIDATO ===\nSintesi: {{ $json.sintesi }}\nLivello di istruzione: {{ $json.livelloIstruzione }}\nCompetenze tecniche: {{ $json.competenze }}\nRuoli adatti: {{ $json.profiliAdatti }}\nPatenti: {{ $json.patenti || 'non indicate' }}\nRegione: {{ $json.regione }}\nDisponibilità: {{ $json.disponibilita }}\n\n=== BANDI DA VALUTARE ({{ $json.numeroBandi }}) ===\n{{ $json.testoBandi }}\n\n=== CRITERI DI PUNTEGGIO (0-100) ===\n- 0-29: incompatibile (manca un requisito obbligatorio, es. laurea, abilitazione o patente specifica).\n- 30-59: possibile ma poco coerente con il profilo.\n- 60-79: buona corrispondenza.\n- 80-100: ottima corrispondenza con competenze e ruoli adatti.\n- Se la sede è nella regione del candidato e la sua disponibilità non è \"Ovunque in Italia\", aggiungi fino a 10 punti.\n- Se un requisito non è indicato nel bando, NON inventarlo: segnalalo come \"da verificare nel bando\".\nScrivi motivazione e requisiti in italiano, in modo breve e concreto.\n\nValuta OGNI bando dell'elenco, nessuno escluso, e riporta per ciascuno esattamente il suo id.\nRispondi esclusivamente con un oggetto JSON valido, senza testo prima o dopo e senza blocchi di codice. Il campo \"punteggio\" deve essere un numero intero, \"consigliato\" deve essere true o false.",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1664,
+        -160
+      ],
+      "id": "936a19de-f360-4e17-ade3-dcd3c24582a4",
+      "name": "Basic LLM Chain",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"valutazioni\": [\n    {\n      \"id\": \"bb46987d62ae4f67b3e4262e1e5ffcb2\",\n      \"punteggio\": 75,\n      \"motivazione\": \"Spiegazione breve del perché il bando è adatto o no\",\n      \"requisitiDaVerificare\": \"Eventuali requisiti mancanti o da controllare\",\n      \"consigliato\": true\n    }\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1808,
+        64
+      ],
+      "id": "5442305b-2bdf-4fc6-933d-45b8f549413d",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.8-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1664,
+        64
+      ],
+      "id": "ead005a7-31ed-4534-b068-3ac1c5aa2ddf",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TOfLlTE7UKse80f7",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Punteggio minimo per ricevere la notifica (deve essere uguale a \"Prepara righe inviati\")\nconst SOGLIA = 60;\n\n// Protegge i caratteri speciali per l'HTML di Telegram\nconst escape = (testo) => String(testo ?? '')\n  .replace(/&/g, '&amp;')\n  .replace(/</g, '&lt;')\n  .replace(/>/g, '&gt;');\n\n// Etichetta in cima al messaggio, in base alla fonte\nconst ETICHETTE_FONTE = {\n  'InPA': '🏛 BANDO PUBBLICO · InPA',\n  'LinkedIn': '💼 ANNUNCIO · LinkedIn',\n};\n\nconst messaggi = [];\nconst risposte = $input.all(); // un elemento per utente\n\nfor (let i = 0; i < risposte.length; i++) {\n  // L'utente che ha generato questa risposta (con i suoi bandi candidati)\n  const utente = $('Abbina bandi e utenti').itemMatching(i).json;\n  const valutazioni = risposte[i].json.output?.valutazioni ?? [];\n\n  // Indice dei bandi candidati di QUESTO utente, per trovarli tramite id\n  const bandiPerId = {};\n  for (const b of utente.candidati) bandiPerId[b.id] = b;\n\n  const scelti = valutazioni\n    .filter(v => bandiPerId[v.id] && v.punteggio >= SOGLIA) // id valido e punteggio sufficiente\n    .map(v => ({ ...bandiPerId[v.id], ...v }))               // unisce bando + valutazione\n    .sort((a, b) => b.punteggio - a.punteggio);              // dal migliore\n\n  for (const b of scelti) {\n    const icona = b.punteggio >= 80 ? '🟢' : '🟡';\n    const etichetta = ETICHETTE_FONTE[b.fonte] ?? `📌 ${escape(b.fonte)}`; // fonti future: mostra il nome\n    const testoLink = b.fonte === 'InPA' ? 'Apri il bando' : \"Apri l'annuncio\";\n\n    const righe = [\n      `<i>${etichetta}</i>`,\n      `${icona} <b>${b.punteggio}/100 — ${escape(b.figura || b.titolo)}</b>`,\n      `🏢 ${escape(b.ente)}`,\n      `📍 ${escape(b.sede)}${b.inRegione ? ' ⭐' : ''}`,\n      `⏳ Scadenza: ${escape(b.scadenza)}`,\n      '',\n      `💬 ${escape(b.motivazione)}`,\n    ];\n    if (b.requisitiDaVerificare) righe.push(`⚠️ Da verificare: ${escape(b.requisitiDaVerificare)}`);\n    righe.push('', `🔗 <a href=\"${b.link}\">${testoLink}</a>`);\n\n    // Ogni messaggio porta con sé il chat Telegram del SUO utente\n    messaggi.push({ json: { chatId: utente.telegramChatId, testo: righe.join('\\n') } });\n  }\n}\n\nreturn messaggi;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        -80
+      ],
+      "id": "92eee827-66c5-4c28-85d1-1670b877e0f1",
+      "name": "Prepara Messaggi"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.testo }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2592,
+        -80
+      ],
+      "id": "eefeb429-47c7-4cd9-b412-b66e1daec9dc",
+      "name": "Send a text message",
+      "webhookId": "862aca71-37c5-4e45-81cc-5f356279e3de",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "telegramApi": {
+          "id": "iHzm93s1Pig2o2rR",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Sei un consulente esperto di concorsi pubblici e selezioni di lavoro in Italia.\nValuta quanto ciascuno dei bandi seguenti è adatto al candidato.\n\n=== PROFILO CANDIDATO ===\nSintesi: {{ $('Abbina bandi e utenti').item.json.sintesi }}\nLivello di istruzione: {{ $('Abbina bandi e utenti').item.json.livelloIstruzione }}\nCompetenze tecniche: {{ $('Abbina bandi e utenti').item.json.competenze }}\nRuoli adatti: {{ $('Abbina bandi e utenti').item.json.profiliAdatti }}\nPatenti: {{ $('Abbina bandi e utenti').item.json.patenti || 'non indicate' }}\nRegione: {{ $('Abbina bandi e utenti').item.json.regione }}\nDisponibilità: {{ $('Abbina bandi e utenti').item.json.disponibilita }}\n\n=== BANDI DA VALUTARE ({{ $('Abbina bandi e utenti').item.json.numeroBandi }}) ===\n{{ $('Abbina bandi e utenti').item.json.testoBandi }}\n\n=== CRITERI DI PUNTEGGIO (0-100) ===\n- 0-29: incompatibile (manca un requisito obbligatorio, es. laurea, abilitazione o patente specifica).\n- 30-59: possibile ma poco coerente con il profilo.\n- 60-79: buona corrispondenza.\n- 80-100: ottima corrispondenza con competenze e ruoli adatti.\n- Se la sede è nella regione del candidato e la sua disponibilità non è \"Ovunque in Italia\", aggiungi fino a 10 punti.\n- Se un requisito non è indicato nel bando, NON inventarlo: segnalalo come \"da verificare nel bando\".\nScrivi motivazione e requisiti in italiano, in modo breve e concreto.\n\nValuta OGNI bando dell'elenco, nessuno escluso, e riporta per ciascuno esattamente il suo id.\nRispondi esclusivamente con un oggetto JSON valido, senza testo prima o dopo e senza blocchi di codice. Il campo \"punteggio\" deve essere un numero intero, \"consigliato\" deve essere true o false.",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        2032,
+        272
+      ],
+      "id": "7c4d6321-81ba-492b-8a3b-6de4040a6fe7",
+      "name": "Basic LLM Chain1"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"valutazioni\": [\n    {\n      \"id\": \"bb46987d62ae4f67b3e4262e1e5ffcb2\",\n      \"punteggio\": 75,\n      \"motivazione\": \"Spiegazione breve del perché il bando è adatto o no\",\n      \"requisitiDaVerificare\": \"Eventuali requisiti mancanti o da controllare\",\n      \"consigliato\": true\n    }\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2176,
+        480
+      ],
+      "id": "43d11ee2-dd29-4505-874f-54a61e71cf42",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        2032,
+        480
+      ],
+      "id": "10696a05-5ad4-49cf-8708-37b792a4ba8c",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TOfLlTE7UKse80f7",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "af31e9a8-db6e-497d-aa06-f3e63c2d0642",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "324fd29a-83d2-4883-b518-87b2c0acee1b",
+              "name": "fonte",
+              "value": "InPA",
+              "type": "string"
+            },
+            {
+              "id": "e169d41f-3264-4135-b669-87a23790d072",
+              "name": "titolo",
+              "value": "={{ $json.titolo }}",
+              "type": "string"
+            },
+            {
+              "id": "79592a4d-37d3-418c-b1ca-b6bbb8e6f365",
+              "name": "figura",
+              "value": "={{ $json.figuraRicercata }}",
+              "type": "string"
+            },
+            {
+              "id": "46eb3301-74c2-4518-ad87-9eb44e4e8d81",
+              "name": "ente",
+              "value": "={{ ($json.entiRiferimento || []).join(', ') }}",
+              "type": "string"
+            },
+            {
+              "id": "0109fa32-0609-4006-8ceb-6a4e1aa826c0",
+              "name": "sede",
+              "value": "={{ ($json.sedi || []).join(' - ') }}",
+              "type": "string"
+            },
+            {
+              "id": "a97ddf36-7b15-411d-9e82-904aec917fa6",
+              "name": "categoria",
+              "value": "={{ ($json.categorie || []).join(', ') }}",
+              "type": "string"
+            },
+            {
+              "id": "702d0072-7252-499a-8180-510b5438d32f",
+              "name": "posti",
+              "value": "={{ $json.numPosti }}",
+              "type": "string"
+            },
+            {
+              "id": "1a342076-2faf-4af2-956d-135bbf3aea6b",
+              "name": "scadenza",
+              "value": "={{ DateTime.fromISO($json.dataScadenza).setZone('Europe/Rome').toFormat('dd/MM/yyyy HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "d280200f-dedc-40ba-874e-8eaf1286662e",
+              "name": "descrizione",
+              "value": "={{ ($json.descrizioneBreve || '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "e1912dd0-c532-46cb-affd-4c1361b59206",
+              "name": "linkEsterno",
+              "value": "={{ $json.linkReindirizzamento }}",
+              "type": "string"
+            },
+            {
+              "id": "00772e18-ebf3-48d1-995a-bc4dcca8827d",
+              "name": "link",
+              "value": "=https://www.inpa.gov.it/bandi-e-avvisi/dettaglio-bando-avviso/?concorso_id={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        720,
+        -160
+      ],
+      "id": "36f7fbe8-e1a8-49b9-a5f3-9c25ee242624",
+      "name": "Normalizza bandi"
+    },
+    {
+      "parameters": {
+        "jsCode": "// === CONFIGURAZIONE ===\nconst MAX_BANDI_PER_UTENTE = 15; // protegge il limite giornaliero di Gemini\nconst RICHIEDONO_LAUREA = ['funzionari', 'elevata qualificazione', 'dirigent'];\n\n// I bandi normalizzati: sono gli stessi per tutti gli utenti.\n// Gli avvisi di mobilità li escludiamo per tutti (riservati a chi è già dipendente pubblico).\nconst bandi = $('Merge').all()\n  .map(item => item.json)\n  .filter(b => !(b.categoria || '').toLowerCase().includes('mobilit'));\n\n// === LE TRE REGOLE ===\n\n// Regola 1: titolo di studio (già pronta, usala come esempio)\n// Chi ha la laurea vede tutto; chi non ce l'ha non vede i profili che la richiedono.\nfunction passaIstruzione(bando, utente) {\n  const haLaurea = (utente.livelloIstruzione || '').startsWith('laurea');\n  if (haLaurea) return true;\n  const testo = `${bando.titolo} ${bando.figura}`.toLowerCase();\n  return !RICHIEDONO_LAUREA.some(parola => testo.includes(parola));\n}\n\n// Regola 2: parole chiave  \n// utente.paroleChiave è un TESTO, es. \"informatic, sviluppat, web\".\n// Deve restituire true se ALMENO UNA parola compare nel titolo o nella figura del bando.\n\nfunction passaParoleChiave(bando, utente) {\n  // \"informatic, sviluppat, web\" → [\"informatic\", \"sviluppat\", \"web\"]\n  const parole = (utente.paroleChiave || '')\n    .split(',')                         // spezza il testo a ogni virgola\n    .map(p => p.trim().toLowerCase())   // toglie gli spazi e mette in minuscolo\n    .filter(p => p.length > 0);         // scarta eventuali pezzi vuoti (es. virgola finale)\n\n  // Il testo del bando in cui cercare: solo titolo e figura (non la descrizione)\n  const testo = `${bando.titolo} ${bando.figura}`.toLowerCase();\n\n  // true se ALMENO UNA parola dell'utente compare nel testo del bando\n  return parole.some(parola => testo.includes(parola));\n}\n\n// Regola 3\n// Se la disponibilità dell'utente contiene la parola \"solo\"\n//   → il bando passa solo se la sua sede contiene la regione dell'utente.\n// In tutti gli altri casi → il bando passa sempre.\n// Attenzione al minuscolo su tutti e tre i testi (disponibilità, sede, regione).\nfunction passaZona(bando, utente) {\n  const disponibilita = (utente.disponibilita || '').toLowerCase();\n\n  // \"Preferibilmente...\" e \"Ovunque...\" → nessun vincolo geografico\n  if (!disponibilita.includes('solo')) return true;\n\n  // \"Solo nella mia regione\" → la sede del bando deve contenere la regione dell'utente\n  const regione = (utente.regione || '').toLowerCase();\n  const sede = (bando.sede || '').toLowerCase();\n  return regione.length > 0 && sede.includes(regione);\n}\n\n// Memoria: le coppie \"utente|bando\" già valutate in passato.\n// Un Set è una lista che permette di controllare MOLTO velocemente se un valore c'è.\nconst giaInviati = new Set(\n  $('Leggi inviati').all()\n    .map(item => item.json)\n    .filter(r => r.email && r.idBando) // ignora l'elemento vuoto se la tabella è vuota\n    .map(r => `${r.email.toLowerCase()}|${r.idBando}`)\n);\n\n// === ABBINAMENTO (già pronto) ===\nconst risultati = [];\n\nfor (const item of $('Leggi utenti').all()) {\n  const utente = item.json;\n\n  // Senza chat Telegram non possiamo avvisarlo: lo saltiamo\n  if (!utente.telegramChatId) continue;\n\n  const regione = (utente.regione || '').toLowerCase();\n\n  const candidati = bandi\n        .filter(b => !giaInviati.has(`${(utente.email || '').toLowerCase()}|${b.id}`))\n        .filter(b => !b.soloPer || b.soloPer === (utente.email || '').toLowerCase())\n    .filter(b => passaIstruzione(b, utente) && passaZona(b, utente) && passaParoleChiave(b, utente))\n    .map(b => ({ ...b, inRegione: (b.sede || '').toLowerCase().includes(regione) }))\n    .sort((a, b) => b.inRegione - a.inRegione) // prima quelli nella regione dell'utente\n    .slice(0, MAX_BANDI_PER_UTENTE);\n\n  // Nessun bando adatto oggi: niente chiamata AI, niente messaggio\n  if (candidati.length === 0) continue;\n\n  // Il profilo nel database è testo: lo ritrasformiamo in oggetto\n  const profilo = JSON.parse(utente.profilo || '{}');\n\n  // Il testo dei bandi per il prompt (un blocco per bando, con l'id ben visibile)\n  const testoBandi = candidati.map(b => [\n    `--- BANDO id=${b.id} ---`,\n    `Titolo: ${b.titolo}`,\n    `Figura: ${b.figura}`,\n    `Ente: ${b.ente}`,\n    `Sede: ${b.sede}`,\n    `Scadenza: ${b.scadenza}`,\n    `Descrizione: ${(b.descrizione || '').slice(0, 600)}`\n  ].join('\\n')).join('\\n\\n');\n\n  risultati.push({\n    json: {\n      email: utente.email,\n      nome: utente.nome,\n      telegramChatId: utente.telegramChatId,\n      regione: utente.regione,\n      disponibilita: utente.disponibilita,\n      livelloIstruzione: utente.livelloIstruzione,\n      patenti: utente.patenti,\n      sintesi: profilo.sintesi,\n      competenze: (profilo.competenzeTecniche || []).join(', '),\n      profiliAdatti: (profilo.profiliAdatti || []).join(', '),\n      numeroBandi: candidati.length,\n      candidati,\n      testoBandi\n    }\n  });\n}\n\nreturn risultati;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -160
+      ],
+      "id": "31d2372b-0d9d-4420-acd1-f79d295d8d4c",
+      "name": "Abbina bandi e utenti"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 10,
+        "simple": false,
+        "filters": {
+          "q": "from:jobalerts-noreply@linkedin.com newer_than:7d"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -496
+      ],
+      "id": "9aa424ec-3274-4a9e-92cc-d0a13ffbd1bf",
+      "name": "Get many messages1",
+      "webhookId": "0a76337e-16d6-44e9-b6da-df9f50f75a01",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "7YgZak7VYoXdcVrL",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// La tua email: deve essere IDENTICA a quella della tabella utenti (in minuscolo).\n// ⚠️ Prima di caricare il workflow su GitHub, sostituiscila con un segnaposto.\n//const PROPRIETARIO = 'LA_TUA_EMAIL@gmail.com';\nconst PROPRIETARIO = 'vincenzo.calvaruso17@gmail.com';\n// Righe da ignorare quando cerchiamo titolo/azienda/luogo\nconst RUMORE = [\n  /^il tuo avviso/i,   // intestazione dell'email\n  /^-{3,}$/,           // eventuali righe separatrici \"-----\"\n];\n\n// Map = \"dizionario\" id → offerta: se la stessa offerta compare in due avvisi, la teniamo una volta sola\nconst offerte = new Map();\n\nfor (const item of $input.all()) {\n  const testo = item.json.text || '';\n\n  // Nome dell'avviso (es. “Sviluppatore Web” (Italia)): lo passiamo all'AI come contesto\n  const avviso = (testo.match(/avviso di offerte di lavoro per (.+)/i) || [])[1] || '';\n\n  // Ogni offerta termina con questa riga. Le parentesi \"catturano\" il link e l'id numerico.\n  // Accettiamo anche \"View job:\" nel caso di avvisi in inglese.\n  const regexLink = /(?:Visualizza offerta di lavoro|View job):\\s*(https:\\/\\/www\\.linkedin\\.com\\/comm\\/jobs\\/view\\/(\\d+)\\S*)/gi;\n\n  let inizioBlocco = 0;\n  for (const match of testo.matchAll(regexLink)) {\n    const idOfferta = match[2];\n\n    // Il testo tra il link precedente e questo = i dati di questa offerta\n    const blocco = testo.slice(inizioBlocco, match.index);\n    inizioBlocco = match.index + match[0].length;\n\n    const righe = blocco.split('\\n')\n      .map(r => r.trim())\n      .filter(r => r.length > 0 && !RUMORE.some(re => re.test(r)));\n\n    const [titolo, azienda, luogo] = righe; // le prime tre righe utili\n    if (!titolo || offerte.has(idOfferta)) continue;\n\n    // Stesso formato di \"Normalizza bandi\", così il resto del motore non cambia\n    offerte.set(idOfferta, {\n      id: `linkedin-${idOfferta}`,\n      fonte: 'LinkedIn',\n      titolo,\n      figura: titolo,\n      ente: azienda || 'Non indicata',\n      sede: luogo || 'Non indicata',\n      categoria: 'Offerta di lavoro privata',\n      posti: null,\n      scadenza: 'Non indicata',\n      descrizione: avviso ? `Trovata dall'avviso LinkedIn: ${avviso}` : '',\n      link: `https://www.linkedin.com/jobs/view/${idOfferta}/`,\n      linkEsterno: null,\n      soloPer: PROPRIETARIO.toLowerCase(), // questa offerta è SOLO per te\n    });\n  }\n}\n\nreturn [...offerte.values()].map(o => ({ json: o }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -608
+      ],
+      "id": "adc49be6-d88a-449a-955e-747b85ade4d8",
+      "name": "Estrai offerte Linkedin"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        960,
+        -448
+      ],
+      "id": "bb2b3600-8540-4163-814d-a6c2ee46d3ad",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "VRq9Jpl4h945CCq4",
+          "mode": "list",
+          "cachedResultName": "utenti",
+          "cachedResultUrl": "/projects/NEBOKxvAPaYBITj4/datatables/VRq9Jpl4h945CCq4"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "attivo",
+              "condition": "isTrue"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1216,
+        -448
+      ],
+      "id": "c773cd26-bf57-4318-8989-260529612632",
+      "name": "Leggi utenti",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "1RX1teitgtsH2HeE",
+          "mode": "list",
+          "cachedResultName": "inviati",
+          "cachedResultUrl": "/projects/NEBOKxvAPaYBITj4/datatables/1RX1teitgtsH2HeE"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        -448
+      ],
+      "id": "51c39aa0-514c-4ab3-90b4-f6e695295b1c",
+      "name": "Leggi inviati",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deve essere uguale alla SOGLIA di \"Prepara messaggi\"\nconst SOGLIA = 60;\n\nconst righe = [];\nconst risposte = $input.all(); // un elemento per utente\n\nfor (let i = 0; i < risposte.length; i++) {\n  const utente = $('Abbina bandi e utenti').itemMatching(i).json;\n  const valutazioni = risposte[i].json.output?.valutazioni ?? [];\n\n  // I bandi candidati di questo utente, per ritrovarli tramite id\n  const bandiPerId = {};\n  for (const b of utente.candidati) bandiPerId[b.id] = b;\n\n  for (const v of valutazioni) {\n    const b = bandiPerId[v.id];\n    if (!b) continue; // id sconosciuto (l'AI ha sbagliato): non salviamo niente\n\n    righe.push({\n      json: {\n        email: (utente.email || '').toLowerCase(),\n        idBando: b.id,\n        fonte: b.fonte,\n        titolo: b.figura || b.titolo,\n        link: b.link,\n        punteggio: Number(v.punteggio) || 0,\n        notificato: v.punteggio >= SOGLIA, // true = è stato mandato su Telegram\n      }\n    });\n  }\n}\n\nreturn righe;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        -288
+      ],
+      "id": "d5ff609a-9d6b-4e31-b929-fef858445b41",
+      "name": "Prepara righe inviati"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "1RX1teitgtsH2HeE",
+          "mode": "list",
+          "cachedResultName": "inviati",
+          "cachedResultUrl": "/projects/NEBOKxvAPaYBITj4/datatables/1RX1teitgtsH2HeE"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $json.email }}"
+            },
+            {
+              "keyName": "idBando",
+              "keyValue": "={{ $json.idBando }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "idBando",
+              "displayName": "idBando",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "titolo",
+              "displayName": "titolo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "notificato",
+              "displayName": "notificato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "punteggio",
+              "displayName": "punteggio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2576,
+        -288
+      ],
+      "id": "a246fe36-6e54-49d4-910e-08b6ea9ae36c",
+      "name": "Salva inviati"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many messages1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Normalizza bandi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Prepara Messaggi",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepara righe inviati",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara Messaggi": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain1": {
+      "main": [
+        [
+          {
+            "node": "Prepara Messaggi",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepara righe inviati",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizza bandi": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Abbina bandi e utenti": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many messages1": {
+      "main": [
+        [
+          {
+            "node": "Estrai offerte Linkedin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estrai offerte Linkedin": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Leggi utenti",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi utenti": {
+      "main": [
+        [
+          {
+            "node": "Leggi inviati",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi inviati": {
+      "main": [
+        [
+          {
+            "node": "Abbina bandi e utenti",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara righe inviati": {
+      "main": [
+        [
+          {
+            "node": "Salva inviati",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "woyNT2uACKMxPIu5",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "e586c1ef-42e3-4231-a58f-c94caa627666",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fd162f1084299d04e25484e5ab497feb9b5f4c26bb7bc5b27f1879f5d71dbe81"
+  },
+  "nodeGroups": [],
+  "id": "xCiqUy8AXG2R4os0",
+  "tags": []
+}

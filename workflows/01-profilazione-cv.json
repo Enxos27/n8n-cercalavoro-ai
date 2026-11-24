@@ -1,0 +1,409 @@
+{
+  "name": "Nodo B - Profilazione CV",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Registra i tuoi dati",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Nome"
+            },
+            {
+              "fieldLabel": "Cognome"
+            },
+            {
+              "fieldLabel": "curriculum Vitaee",
+              "fieldType": "file"
+            },
+            {
+              "fieldLabel": "regione",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Sicilia"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "disponibilita a spostarsi",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Solo nella mia regione"
+                  },
+                  {
+                    "option": "Preferibilmente nella mia regione, ma valuto tutta Italia"
+                  },
+                  {
+                    "option": "Ovunque in Italia"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "patente",
+              "fieldType": "checkbox",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Nessuna"
+                  },
+                  {
+                    "option": "A"
+                  },
+                  {
+                    "option": "B"
+                  },
+                  {
+                    "option": "C"
+                  },
+                  {
+                    "option": "CQC"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "578bf9b4-b6a8-491b-b7a2-68761e3a8580",
+      "name": "On form submission",
+      "webhookId": "6a62ef51-98bc-4892-9460-3a6c6aefb354"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "curriculum_Vitaee",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "ea4131ac-02a2-4070-a8d7-3e1d2ab88a35",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Dati in ingresso\nlet testo = $input.first().json.text;\nconst form = $('On form submission').first().json;\nconst nome = form.Nome;\nconst cognome = form.Cognome;\n\n// 2. Email → [EMAIL]\ntesto = testo.replace(/[\\w.+-]+@[\\w-]+\\.[\\w.]+/g, '[EMAIL]');\n\n// 3. Link (http://, https://, www.) → [LINK]\n//    \"https?\" = http con la s facoltativa; \\S+ = tutto fino al primo spazio\n// Link → [LINK]\n// Prima parte: indirizzi con http:// https:// o www.\n// Seconda parte: domini \"nudi\" come github.com/... o linkedin.com/...\ntesto = testo.replace(/(https?:\\/\\/|www\\.)\\S+|\\b[\\w-]+\\.(com|it|io|dev|net|org|eu)\\/\\S*/gi, '[LINK]');\n\n// 4. Telefono → [TELEFONO]\n//    +39 facoltativo, poi gruppi di cifre separati (o no) da spazi, punti o trattini.\n//    \\b = \"inizio di parola\", evita di prendere pezzi di numeri più lunghi\ntesto = testo.replace(/(\\+39[\\s.-]?)?\\b\\d{3}[\\s.-]?\\d{3,4}[\\s.-]?\\d{3,4}\\b/g, '[TELEFONO]');\n\n// 5. Codice fiscale → [CF]\n//    ✏️ TOCCA A TE: 6 lettere, 2 cifre, 1 lettera, 2 cifre, 1 lettera, 3 cifre, 1 lettera\ntesto = testo.replace(/\\b[A-Z]{6}\\d{2}[A-Z]\\d{2}[A-Z]\\d{3}[A-Z]\\b/gi, '[CF]');\n\n// 6. Nome e cognome → [NOME]\n//    Il nome è una variabile, quindi non si può scrivere dentro /.../\n//    Si usa: new RegExp(variabile, 'gi')\ntesto = testo.replace(new RegExp(nome, 'gi'), '[NOME]');\ntesto = testo.replace(new RegExp(cognome,'gi'), '[Cognome]');\n\nreturn [{ json: { testoAnonimo: testo } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "2a746da6-cff9-4d30-9712-14205e3f8278",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Sei un esperto di selezione del personale. Analizza il seguente CV e estrai un profilo strutturato.\n\nREGOLE:\n- Usa SOLO informazioni presenti nel CV. Non inventare competenze, esperienze, lingue o patenti.\n- Se un'informazione manca, usa una lista vuota [] o null.\n- Ignora i segnaposto [NOME], [EMAIL], [TELEFONO], [CF], [LINK]: sono dati rimossi per privacy.\n- \"livelloIstruzione\" deve essere uno tra: nessuno, licenza_media, diploma, laurea_triennale, laurea_magistrale.\n- \"anni\" nelle esperienze è un numero (stima dalle date, arrotonda).\n- \"profiliAdatti\": 3-6 ruoli realistici per questo candidato, considerando anche le esperienze non informatiche.\n- \"paroleChiave\": 5-15 radici di parole in minuscolo (es. \"informatic\", \"tecnic\") utili a trovare bandi adatti nei titoli.\nRispondi esclusivamente con un oggetto JSON valido, senza testo prima o dopo e senza blocchi di codice.\n- \"lingue.livello\": riporta il livello esattamente come scritto nel CV, senza convertirlo.\n- \"progetti\": includi i progetti personali o di studio; \"certificazioni\": indica \"conseguita\": false se è \"in corso\".\n\nRispondi esclusivamente con un oggetto JSON valido, senza testo prima o dopo e senza blocchi di codice. Il campo \"punteggio\" deve essere un numero intero, \"consigliato\" deve essere true o false.\n\nCV:\n{{ $json.testoAnonimo }}",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        672,
+        0
+      ],
+      "id": "be77f630-2a1d-4373-85d8-018bebd29ece",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-flash-latest",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        208
+      ],
+      "id": "9f09edc8-a50b-4153-b18f-172d3b6243e9",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TOfLlTE7UKse80f7",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"sintesi\": \"Breve riassunto del profilo in 2-3 frasi\",\n  \"livelloIstruzione\": \"diploma\",\n  \"titoloStudio\": \"Nome del titolo di studio\",\n  \"formazione\": [\"Corso o master - Ente - anno\"],\n  \"competenzeTecniche\": [\"Competenza 1\", \"Competenza 2\"],\n  \"competenzeTrasversali\": [\"Competenza trasversale 1\"],\n  \"esperienze\": [\n    { \"ruolo\": \"Ruolo\", \"settore\": \"Settore\", \"anni\": 1.5, \"descrizione\": \"Breve descrizione\" }\n  ],\n  \"progetti\": [\n    { \"nome\": \"Nome progetto\", \"descrizione\": \"Breve descrizione\", \"tecnologie\": [\"Tecnologia 1\"] }\n  ],\n  \"certificazioni\": [\n    { \"nome\": \"Nome certificazione\", \"conseguita\": false }\n  ],\n  \"lingue\": [{ \"lingua\": \"Lingua\", \"livello\": \"Livello come scritto nel CV\" }],\n  \"patenti\": [],\n  \"profiliAdatti\": [\"Ruolo adatto 1\", \"Ruolo adatto 2\"],\n  \"paroleChiave\": [\"radice1\", \"radice2\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        800,
+        208
+      ],
+      "id": "c1fba1d2-361b-4939-9138-4cf4d9492293",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "VRq9Jpl4h945CCq4",
+          "mode": "list",
+          "cachedResultName": "utenti",
+          "cachedResultUrl": "/projects/NEBOKxvAPaYBITj4/datatables/VRq9Jpl4h945CCq4"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $('On form submission').first().json.Email.trim().toLowerCase() }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "attivo": true,
+            "email": "={{ $('On form submission').first().json.Email.trim().toLowerCase() }}",
+            "regione": "={{ $('On form submission').first().json.regione }}",
+            "paroleChiave": "={{ ($json.output.paroleChiave || []).join(', ') }}",
+            "profilo": "={{ JSON.stringify($json.output) }}",
+            "livelloIstruzione": "={{ $json.output.livelloIstruzione }}",
+            "patenti": "={{ [].concat($('On form submission').first().json.patente ?? []).join(', ') }}",
+            "disponibilita": "={{ $('On form submission').first().json['disponibilita a spostarsi'] }}",
+            "nome": "={{ $('On form submission').first().json.Nome }}",
+            "cognome": "={{ $('On form submission').first().json.Cognome }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "nome",
+              "displayName": "nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "cognome",
+              "displayName": "cognome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "regione",
+              "displayName": "regione",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "disponibilita",
+              "displayName": "disponibilita",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "patenti",
+              "displayName": "patenti",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "livelloIstruzione",
+              "displayName": "livelloIstruzione",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "paroleChiave",
+              "displayName": "paroleChiave",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "profilo",
+              "displayName": "profilo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "attivo",
+              "displayName": "attivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "aae943ea-5210-4454-95ca-e3b133ad82a0",
+      "name": "Upsert row(s)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Upsert row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "woyNT2uACKMxPIu5",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "saveDataSuccessExecution": "none",
+    "executionTimeout": -1,
+    "redactCallerExecutions": true
+  },
+  "versionId": "b14a606e-70e2-4bcf-83d7-f58ed9674620",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fd162f1084299d04e25484e5ab497feb9b5f4c26bb7bc5b27f1879f5d71dbe81"
+  },
+  "nodeGroups": [],
+  "id": "l5urqvUnQRqYZUZ7",
+  "tags": []
+}

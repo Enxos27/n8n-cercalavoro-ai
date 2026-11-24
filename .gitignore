@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# File con dati sensibili o locali
+.env
+*.env
+backup/
+
+# Esportazioni di prova o con dati reali (da non pubblicare)
+*-privato.json
